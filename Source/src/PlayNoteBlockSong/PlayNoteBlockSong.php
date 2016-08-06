@@ -5,9 +5,12 @@ use pocketmine\plugin\PluginBase;
 use pocketmine\command\CommandSender;
 use pocketmine\command\Command;
 use pocketmine\level\Position;
+use pocketmine\math\Vector3;
 use pocketmine\utils\TextFormat as Color;
 use pocketmine\event\TranslationContainer as Translation;
-use AddNoteBlock\block\NoteBlock;
+use pocketmine\level\sound\NoteblockSound;
+use pocketmine\network\protocol\UpdateBlockPacket;
+use pocketmine\scheduler\CallbackTask;
 use PlayNoteBlockSong\task\LoadSongAsyncTask;
 use PlayNoteBlockSong\task\PlaySongTask;
 
@@ -23,7 +26,7 @@ class PlayNoteBlockSong extends PluginBase{
 	}
 
 	public function onCommand(CommandSender $sender, Command $cmd, $label, array $sub){
-		$ik = $this->isKorean();
+		$ir = $this->isRussian();
 		if(!isset($sub[0]) || $sub[0] == ""){
 			return false;
 		}
@@ -33,15 +36,15 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.play")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif($this->play){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "이미 재생중입니다." : "Already playing");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "Песня уже играет!" : "Song already playing");
 				}elseif(count($this->songs) <= 0){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "당신은 음악이 하나도 없습니다." : "You don't have any song");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "У вас нет ни одной песни" : "You don't have any song");
 				}else{
 					if(!$this->song instanceof SongPlayer){
 						$this->song = clone $this->songs[$this->index][self::SONG];
 					}
 					$this->play = true;
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "음악을 재생합니다. : " : "Play the song : ") . $this->songs[$this->index][self::NAME];
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Играет песня:" : "Playing the sound: ") . $this->songs[$this->index][self::NAME];
 				}
 			break;
 			case "stop":
@@ -49,10 +52,10 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.stop")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif(!$this->play){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "음악이 재생중이 아닙니다." : "Shong is not playing");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "Песня не играет!" : "Song is not playing");
 				}else{
 					$this->play = false;
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "음악을 중지합니다." : "Stop the song");
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Остановка песни" : "Stop the song");
 				}
 			break;
 			case "next":
@@ -60,7 +63,7 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.next")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif(count($this->songs) <= 0){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "당신은 음악이 하나도 없습니다." : "You don't have any song");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "У вас нет ни одной песни!" : "You don't have any song");
 				}else{
 					if(!isset($this->songs[$this->index + 1])){
 						$this->index = 0;
@@ -68,8 +71,8 @@ class PlayNoteBlockSong extends PluginBase{
 						$this->index++;
 					}
 					$this->song = clone $this->songs[$this->index][self::SONG];
-					$this->getLogger()->notice(Color::AQUA . "Play next song : " . $this->songs[$this->index][self::NAME]);
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "다음 음악을 재생합니다. : " : "Play next song : ") . $this->songs[$this->index][self::NAME];
+					$this->getLogger()->notice(Color::AQUA . "Play next song: " . $this->songs[$this->index][self::NAME]);
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Играет следующая песня: " : "Play next song: ") . $this->songs[$this->index][self::NAME];
 				}
 			break;
 			case "prev":
@@ -77,7 +80,7 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.prev")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif(count($this->songs) <= 0){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "당신은 음악이 하나도 없습니다." : "You don't have any song");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "У вас нет ни одной песни" : "You don't have any song");
 				}else{
 					if(!isset($this->songs[$this->index - 1])){
 						$this->index = 0;
@@ -85,8 +88,8 @@ class PlayNoteBlockSong extends PluginBase{
 						$this->index--;
 					}
 					$this->song = clone $this->songs[$this->index][self::SONG];
-					$this->getLogger()->notice(Color::AQUA . "Play prev song : " . $this->songs[$this->index][self::NAME]);
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "이전 음악을 재생합니다. : " : "Play prev song : ") . $this->songs[$this->index][self::NAME];
+					$this->getLogger()->notice(Color::AQUA . "Play prev song: " . $this->songs[$this->index][self::NAME]);
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Играет предыдущая песня: " : "Play prev song: ") . $this->songs[$this->index][self::NAME];
 				}
 			break;
 			case "shuffle":
@@ -94,13 +97,13 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.shuffle")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif(count($this->songs) <= 0){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "당신은 음악이 하나도 없습니다." : "You don't have any song");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "У вас нет ни одной песни" : "You don't have any song");
 				}else{
 					shuffle($this->songs);
 					$this->index = 0;
 					$this->song = clone $this->songs[$this->index][self::SONG];
-					$this->getLogger()->notice(Color::AQUA . "Song list is Shuffled. Now song : " . $this->songs[$this->index][self::NAME]);
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "음악 목록이 뒤섞였습니다. 다음 음악 : " : "Song list is Shuffled. Now song : ") . $this->songs[$this->index][self::NAME];
+					$this->getLogger()->notice(Color::AQUA . "Song list is shuffled. Now song: " . $this->songs[$this->index][self::NAME]);
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Список песен перемешан. Сейчас играет: " : "Song list is shuffled. Now song: ") . $this->songs[$this->index][self::NAME];
 				}
 			break;
 			case "list":
@@ -108,10 +111,10 @@ class PlayNoteBlockSong extends PluginBase{
 				if(!$sender->hasPermission("playnoteblocksong.cmd.list")){
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}elseif(count($this->songs) <= 0){
-					$r = Color::RED . "[PlayNBS] " . ($ik ? "당신은 음악이 하나도 없습니다." : "You don't have any song");
+					$r = Color::RED . "[PlayNBS] " . ($ir ? "У вас нет ни одной песни" : "You don't have any song");
 				}else{
 					$lists = array_chunk($this->songs, 5);
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "음악 목록 (페이지: " : "Song list (Page: ") . ($page = min(isset($sub[1]) && is_numeric($sub[1]) && isset($lists[$sub[1] - 1]) ? $sub[1] : 1, count($lists))). "/" . count($lists) . ") (" . count($this->songs) . ")";
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Список песен (Страница: " : "Song list (Page: ") . ($page = min(isset($sub[1]) && is_numeric($sub[1]) && isset($lists[$sub[1] - 1]) ? $sub[1] : 1, count($lists))). "/" . count($lists) . ") (" . count($this->songs) . ")";
 					if(isset($lists[--$page])){
 						foreach($lists[$page] as $key => $songData){
 							$r .= "\n" . Color::GOLD . "    [" . (($page * 5 + $key) + 1) .  "] " . $songData[self::NAME];
@@ -125,7 +128,7 @@ class PlayNoteBlockSong extends PluginBase{
 					$r = new Translation(Color::RED . "%commands.generic.permission");
 				}else{
 					$this->loadSong();
-					$r = Color::YELLOW . "[PlayNBS] " . ($ik ? "음악을 다시 로드했습니다." : "Reloaded songs.");
+					$r = Color::YELLOW . "[PlayNBS] " . ($ir ? "Список песен перезагружен" : "Reloaded songs.");
 				}
 			break;
 			default:
@@ -173,9 +176,21 @@ class PlayNoteBlockSong extends PluginBase{
 		}
 	}
 
-	public function sendSound($pitch, $type = NoteBlock::PIANO_OR_HARP){
+	public function sendSound($pitch, $type = NoteblockSound::INSTRUMENT_PIANO){
 		foreach($this->getServer()->getOnlinePlayers() as $player){
-			NoteBlock::runNoteBlockSound(new Position($player->x, $player->y + 1, $player->z, $player->level), $pitch, $type, $player);
+            $pk = new UpdateBlockPacket();
+            $pk->x = $player->x;
+            $pk->y = $player->y + 4;
+            $pk->z = $player->z;
+            $pk->blockId = 25;
+            $pk->blockData = 0;
+            $pk->flags = UpdateBlockPacket::FLAG_ALL;
+            $player->dataPacket($pk);
+            $player->level->addSound(new NoteblockSound(new Vector3($player->x, $player->y + 4, $player->z), $type, $pitch), array($player));
+            $pk1 = clone $pk;
+            $pk1->blockId = $player->level->getBlockIdAt($pk->x, $pk->y, $pk->z);
+            $pk1->blockData = $player->level->getBlockDataAt($pk->x, $pk->y, $pk->z);
+            $player->dataPacket($pk1);
 		}
 	}
 
@@ -187,7 +202,7 @@ class PlayNoteBlockSong extends PluginBase{
 		}
 	}
 
-	public function isKorean(){
-		return $this->getServer()->getLanguage()->getName() == "\"한국어\"";
+	public function isRussian(){
+		return $this->getServer()->getLanguage()->getName() == "Русский";
 	}
 }

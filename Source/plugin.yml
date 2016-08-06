@@ -1,17 +1,16 @@
 name: PlayNoteBlockSong
 main: PlayNoteBlockSong\PlayNoteBlockSong
-prefix: "PlayNBS"
-version: "1.1"
+prefix: "§ePlayNBS"
+version: "1.2"
 api: [1.13.0, 2.0.0]
-depend: [AddNoteBlock]
-author: DeBe
+author: MrGenga
 load: StartUp
 
 commands:
   song:
     permission: playnoteblocksong.cmd
-    description: <Play | Stop | Next | Prev | Shuffle | List | Reload>
-    usage: /Song <Play | Stop | Next | Prev | Shuffle | List | Reload>
+    description: <play | stop | next | prev | shuffle | list | reload>
+    usage: /song <play | stop | next | prev | shuffle | list | reload>
 
 permissions:
   playnoteblocksong.cmd.*:

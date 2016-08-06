@@ -14,7 +14,7 @@ namespace PlayNoteBlockSong;
  * http://dev.bukkit.org/bukkit-plugins/icjukebox/pages/tracks/
  */
 
-use AddNoteBlock\block\NoteBlock;
+use pocketmine\level\sound\NoteblockSound;
 
 class SongPlayer extends \stdClass{
 	private $plugin;
@@ -101,19 +101,19 @@ class SongPlayer extends \stdClass{
 				// Step #3: Byte: Note block instrument
 				switch($this->getByte()){
 					case 1: // Double Bass (wood)
-						$type = NoteBlock::BASS_GUITAR;
+						$type = NoteblockSound::INSTRUMENT_BASS;
 					break;
 					case 2: // Bass Drum (stone)
-						$type = NoteBlock::BASS_DRUM;
+						$type = NoteblockSound::INSTRUMENT_BASS_DRUM;
 					break;
 					case 3: // Snare Drum (sand)
-						$type = NoteBlock::SNARE_DRUM;
+						$type = NoteblockSound::INSTRUMENT_TABOUR;
 					break;
 					case 4: // Click (glass)
-						$type = NoteBlock::CLICKS_AND_STICKS;
+						$type = NoteblockSound::INSTRUMENT_CLICK;
 					break;
 					default: // Piano (air)
-						$type = NoteBlock::PIANO_OR_HARP;
+						$type = NoteblockSound::INSTRUMENT_PIANO;
 					break;
 				}
 
